@@ -1,5 +1,7 @@
 import random
 import hashlib
+
+FIXED_LENGTH = 128
 def add_points(P, Q, p):
     x1, y1 = P
     x2, y2 = Q
@@ -81,12 +83,12 @@ def sqrt_mod(a, p):
     return r
 
 def encode_message(message: str, a, b, q):
-    message = bin(int(message.encode('utf-8').hex(), 16))
     k = len(bin(q)) - 2  # Bit length of the prime field
-    l = 1  # Assume one bit is subtracted from the fixed-length message
+    l = k - 1 - FIXED_LENGTH  # Assume one bit is subtracted from the fixed-length message
 
+    x = int(message, 2) << l
+    # print(bin(x)[2:])
     for _ in range(2**l):  # Try 2^l times
-        x = int(message, 2) << l  # Concatenate message with l zeros
         x_prime = (x**3 + a*x + b) % q  # Compute x'^3 + ax + b mod q
 
         if legendre_symbol(x_prime, q) == 1:  # Check if x' is a quadratic residue
@@ -94,11 +96,16 @@ def encode_message(message: str, a, b, q):
             return x, y_sqrt
         else:
             x += 1  # Increment the last l bits of x
+            x_prime = (x**3 + a*x + b) % q  # Compute x'^3 + ax + b mod q
+            if legendre_symbol(x_prime, q) == 1:  # Check if x' is a quadratic residue
+                y_sqrt = sqrt_mod(x_prime, q)  # Compute square root of x' mod q
+                return x, y_sqrt
 
     raise ValueError("non-encodable")
 
 def decode_point(point, a, b, q):
     x, y = point
+    padding_length = len(bin(q)) - 2 - 1 - FIXED_LENGTH
 
     # Ensure that the point is on the curve
     if (y**2 % q) != ((x**3 + a*x + b) % q):
@@ -106,8 +113,10 @@ def decode_point(point, a, b, q):
 
     # Extract the original message by removing trailing zeros
     binary_message = bin(x)[2:]
-    original_message = binary_message.rstrip('0')
-
+    print("Decoded part: ", binary_message)
+    original_message = binary_message[:-padding_length]
+    while (len(original_message) < FIXED_LENGTH):
+        original_message = "0" + original_message
     return original_message
 
 def textToInt(text):
@@ -120,7 +129,10 @@ def textToInt(text):
 # m = textToInt(message)
 # hash_hex = hashlib.sha1(message.encode('utf-8')).hexdigest()
 # hash_int = int(hash_hex, 16)
-m = ["Chào mừng 20 năm ngày", "thành lập trường ĐHCN"]
+m = "Chào mừng 20 năm ngày thành lập trường ĐHCN"
+# m = "Chao mung 20 nam ngay thanh lap truong DHCN"
+binary_m = str(''.join(format(i, '08b') for i in bytearray(m, encoding ='utf-8')))
+print("Origin message: ", m.encode('utf-8').hex())
 
 a = 0; b = 7
 G = (55066263022277343669578718895168534326250603453777594175500187360389116729240,
@@ -131,20 +143,19 @@ n = 1157920892373161954235709850086879078528375642790749043826051631415181614943
 
 # Alice: Generate private key and public key
 # private key of Alice
-d = random.getrandbits(256)
+alice_private_key = random.getrandbits(256)
 
 # public key of Alice
-Q = apply_double_and_add_method(G = G, k = d, p = p)
+alice_public__key = apply_double_and_add_method(G = G, k = alice_private_key, p = p)
 
 # Bob: Generate private key and public key
 bob_private_key = random.getrandbits(256)
 bob_public__key = apply_double_and_add_method(G = G, k = bob_private_key, p = p)
 
-
-
 # Alice: Encrpyt message
 def encrypt(m, r):
-    s = encode_message(m, a, b, p)
+    s = encode_message(m, a, b, p) 
+    print("Encoded point: ", s)
 
     c1 = apply_double_and_add_method(G = G, k = r, p = p)
 
@@ -154,12 +165,12 @@ def encrypt(m, r):
     return c1, c2
 
 # -------------------------
-r = random.getrandbits(128)
-c1, c2 = encrypt(m, r)
+# r = random.getrandbits(128)
+# c1, c2 = encrypt(m, r)
 
-# Sign
-r = ( bob_public__key[0] ) % n
-s = ( ( hash_int + r * d ) * pow(bob_private_key, -1, n) ) % n
+# # Sign
+# r = ( bob_public__key[0] ) % n
+# s = ( ( hash_int + r * alice_private_key ) * pow(bob_private_key, -1, n) ) % n
 
 
 
@@ -170,14 +181,39 @@ def decrypt(c1, c2):
     s_prime = add_points(P = c2, Q = s_prime, p = p)
     return s_prime
 
-s_prime = decrypt(c1, c2)
+# s_prime = decrypt(c1, c2)
 
-# Bob: Start verification
-w = pow(s, -1, n)
-u1 = apply_double_and_add_method(G = G, k = ( hash_int * w ) % n, p = p)
-u2 = apply_double_and_add_method(G = Q, k = ( r * w ) % n, p = p)
+# # Bob: Start verification
+# w = pow(s, -1, n)
+# u1 = apply_double_and_add_method(G = G, k = ( hash_int * w ) % n, p = p)
+# u2 = apply_double_and_add_method(G = alice_public__key, k = ( r * w ) % n, p = p)
 
-# u1 + u2
-checkpoint = add_points(P = u1, Q = u2, p = p)
+# # u1 + u2
+# checkpoint = add_points(P = u1, Q = u2, p = p)
 
-assert checkpoint[0] == r
+# assert checkpoint[0] == r
+
+binary_decrypted_message = ""
+part_number = 1
+for i in range(0, len(binary_m), FIXED_LENGTH):
+    print("Processing part #", part_number)
+    org_part = binary_m[i:i + FIXED_LENGTH]
+    print("Origin msg (Bin): ", org_part)
+    # Encrypt
+    r = random.getrandbits(128)
+    c1, c2 = encrypt(org_part, r)
+
+    # Decrypt
+    decrypted = decrypt(c1, c2)
+    print("Decrypted point:", decrypted)
+    decoded = decode_point(decrypted, a, b, p)
+    print("Decoded msg (Bin): ", decoded)
+    decrypted_message = int(decoded, 2).to_bytes(FIXED_LENGTH // 8, byteorder='big')
+    print("Decrypted part #", part_number, ": Plain text:", decrypted_message.decode("utf-8"))
+
+    binary_decrypted_message += decoded
+    part_number += 1
+    print()
+
+decrypted_message = int(binary_decrypted_message, 2).to_bytes((len(binary_decrypted_message) + 7) // 8, byteorder='big')
+print(decrypted_message.decode("utf-8"))
