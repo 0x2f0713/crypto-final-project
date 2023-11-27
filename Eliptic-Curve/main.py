@@ -134,6 +134,7 @@ m = "Chào mừng 20 năm ngày thành lập trường ĐHCN"
 binary_m = str(''.join(format(i, '08b') for i in bytearray(m, encoding ='utf-8')))
 print("Origin message: ", m.encode('utf-8').hex())
 
+# Secp256k1
 a = 0; b = 7
 G = (55066263022277343669578718895168534326250603453777594175500187360389116729240,
      32670510020758816978083085130507043184471273380659243275938904335757337482424)
@@ -197,12 +198,25 @@ binary_decrypted_message = ""
 part_number = 1
 for i in range(0, len(binary_m), FIXED_LENGTH):
     print("Processing part #", part_number)
+    print("----------------------------")
+    print("Alice action: ")
+    print("-----")
     org_part = binary_m[i:i + FIXED_LENGTH]
+    while (len(org_part) < FIXED_LENGTH): # Add padding if length smaller than FIXED_LENGTH
+        org_part += "0"
     print("Origin msg (Bin): ", org_part)
+    # Signing
+    hash_hex = hashlib.sha512(org_part.encode("ascii")).hexdigest()
+    hash_int = int(hash_hex, 16)
+    r = (bob_public__key[0] ) % n
+    s = ((hash_int + r * alice_private_key ) * pow(bob_private_key, -1, n) ) % n
     # Encrypt
-    r = random.getrandbits(128)
-    c1, c2 = encrypt(org_part, r)
+    rand = random.getrandbits(128)
+    c1, c2 = encrypt(org_part, rand)
 
+    print("----------------------------")
+    print("Bob action:")
+    print("-----")
     # Decrypt
     decrypted = decrypt(c1, c2)
     print("Decrypted point:", decrypted)
@@ -210,7 +224,17 @@ for i in range(0, len(binary_m), FIXED_LENGTH):
     print("Decoded msg (Bin): ", decoded)
     decrypted_message = int(decoded, 2).to_bytes(FIXED_LENGTH // 8, byteorder='big')
     print("Decrypted part #", part_number, ": Plain text:", decrypted_message.decode("utf-8"))
-
+    
+    # Verification
+    w = pow(s, -1, n)
+    u1 = apply_double_and_add_method(G = G, k = ( hash_int * w ) % n, p = p)
+    u2 = apply_double_and_add_method(G = alice_public__key, k = ( r * w ) % n, p = p)
+    # u1 + u2
+    checkpoint = add_points(P = u1, Q = u2, p = p)
+    
+    if (checkpoint[0] == r):
+        print("Signature has been verified")
+    print("----------------------------")
     binary_decrypted_message += decoded
     part_number += 1
     print()
