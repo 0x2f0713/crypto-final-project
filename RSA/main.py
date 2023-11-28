@@ -26,21 +26,26 @@ q = 999900049387"""
 
 from Crypto.PublicKey import RSA
 RSAkey = RSA.generate(3072)
-p = getattr(RSAkey, 'p')
-q = getattr(RSAkey, 'q')
+p = RSAkey.p
+q = RSAkey.q
+e = RSAkey.e
+d = RSAkey.d
 
 n = p*q
+if n == RSAkey.n:
+    print("Same n")
+
 totient = (p-1)*(q-1)
 
 print("mod: ",n)
-print("totient function",totient)
+# print("totient function",totient)
 
-e = random.randint(1, totient)
+# e = random.randint(1, totient)
 
-#e and totient must be coprime
+# #e and totient must be coprime
 
-while math.gcd(totient, e) != 1:
-	e = random.randint(1, totient)
+# while math.gcd(totient, e) != 1:
+# 	e = random.randint(1, totient)
 
 print("public key: ",e)
 
@@ -56,7 +61,7 @@ for i in range(totient):
 """
 
 # d = commons.modInverse(e, totient)
-d = pow(e, -1, totient)
+# d = pow(e, -1, totient)
 
 print("private key: ",d)
 
@@ -118,35 +123,3 @@ if bobHash == decryptedSignature:
 	print("signature is valid")
 else:
 	print("signature is not valid!!!")
-
-#--------------------------------
-print("-------------------------")
-print("key exchange")
-print("-------------------------")
-
-print("Bob:")
-
-key = 1234567891234567 #16 byte
-encryptedkey = pow(key, publickey, n)
-print("encryptedkey: ",encryptedkey)
-
-message = "hi alice, howdy?"
-
-from Crypto.Cipher import AES
-
-obj = AES.new(str(key))
-ciphertext = obj.encrypt(message)
-
-print("ciphertext: ", ciphertext)
-
-#now, bob sends ciphertext and encrypted key to Alice
-#--------------------------------
-print("Alice:")
-
-restoredkey = pow(encryptedkey, privatekey, n)
-print("restored key: ",restoredkey)
-
-obj2 = AES.new(str(restoredkey))
-restoredtext = obj2.decrypt(ciphertext)
-
-print("restoredtext: ",restoredtext)
