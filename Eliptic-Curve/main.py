@@ -234,6 +234,8 @@ for i in range(0, len(binary_m), FIXED_LENGTH):
     
     if (checkpoint[0] == r):
         print("Signature has been verified")
+    else:
+        print("Signature is invalid")
     print("----------------------------")
     binary_decrypted_message += decoded
     part_number += 1
