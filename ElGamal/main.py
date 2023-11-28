@@ -10,13 +10,13 @@ print("-----------------------")
 
 # Create 1024-bits prime
 config = ElGamal.generate(1024, get_random_bytes)
-p = config.p
+p = config.p.__int__()
 
-g = 6
+g = config.g.__int__()
 
-x = random.randint(1, p-2)
+x = config.x.__int__()
 
-y = pow(g, x, p)
+y = config.y.__int__()
 
 print("public key: (p=",p,", g=",g,", y=",y,")")
 print("private key: ", x)
